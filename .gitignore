@@ -1,0 +1,9 @@
+# Python environment (rebuilt from requirements.txt)
+.venv/
+__pycache__/
+
+# Generated database (rebuilt by src/ingest.py)
+data/*.db
+
+# macOS
+.DS_Store
