@@ -1,8 +1,8 @@
-# ⚽ Premier League Match Predictor & Odds Tracker
+# ⚽ Premier League Match Forecasting: Can a Model Beat the Betting Market?
 
 An end-to-end data project: an automated pipeline collects Premier League results and
-bookmaker odds, a machine learning model predicts match outcomes, and a live dashboard
-compares the model against the bookmakers to find "value bets".
+bookmaker odds, a machine learning model forecasts match outcomes, and a live dashboard
+compares the model's probabilities against the market to find mispriced matches.
 
 > Status: **Phase 1 in progress** (data pipeline)
 
@@ -41,7 +41,7 @@ This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
 
 ## Project structure
 ```
-football-predictor/
+premier-league-match-forecasting/
 ├── data/            # SQLite database (generated)
 ├── src/
 │   └── ingest.py    # Phase 1: download + load match data
