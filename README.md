@@ -4,7 +4,7 @@ An end-to-end data project: an automated pipeline collects Premier League result
 bookmaker odds, a machine learning model forecasts match outcomes, and a live dashboard
 compares the model's probabilities against the market to find mispriced matches.
 
-> Status: **Phase 2 complete** (SQL exploration). Next: feature engineering.
+> Status: **Phase 3 complete** (feature engineering). Next: the forecasting model.
 
 ## Why this project
 Bookmakers price football matches the way traders price stocks. This project combines
@@ -17,7 +17,7 @@ product (entertainment)**.
 |---|---|---|---|
 | 1. Data pipeline | Download 6 seasons of EPL results + odds into a SQL database | Python, SQL, data cleaning | ✅ |
 | 2. Exploration | SQL analysis: home advantage, bookmaker accuracy and margin, market expectations | SQL, EDA | ✅ |
-| 3. Features | Rolling form, goals, shots, xG, Elo ratings, rest days | Feature engineering | ⬜ |
+| 3. Features | Rolling form, goals, shots on target, Elo ratings, rest days, market probabilities | Feature engineering, leakage testing | ✅ |
 | 4. Model | Predict Home/Draw/Away probabilities (logistic regression → XGBoost) | ML, probability calibration | ⬜ |
 | 5. Betting backtest | Compare model vs. bookmaker odds, simulate a betting strategy, track ROI | Finance thinking, statistics | ⬜ |
 | 6. Automation | GitHub Actions runs the pipeline + predictions every day | MLOps, scheduling | ⬜ |
@@ -38,6 +38,29 @@ Queries: [`sql/02_exploration.sql`](sql/02_exploration.sql).
 **Takeaway:** the betting market is well calibrated overall, but its margin is growing and
 there are hints that it overrates big clubs. Phase 4–5 test whether a model can exploit that.
 
+## Features (Phase 3)
+Every match gets 34 columns built from information known **before kick-off**
+([`src/features.py`](src/features.py), walkthrough in
+[`notebooks/03_features.ipynb`](notebooks/03_features.ipynb)).
+
+| Feature | How it's built |
+|---|---|
+| **Form** | Average points over each team's last 5 matches |
+| **Attack / defence** | Average goals scored and conceded over the last 5 |
+| **Shots on target** | Average for and against over the last 5 |
+| **Elo rating** | Team strength updated after every result (home advantage 60 points, promoted teams start at 1450) |
+| **Rest days** | Days since each team's previous match |
+| **Market probability** | Bookmaker odds converted to probabilities with the margin removed |
+
+**No data leakage:** a test changes one match's score to 0–9, rebuilds every feature and
+confirms that match's features are unchanged while later matches update.
+
+![Home win rate by Elo gap](images/elo_vs_home_win.png)
+
+- The market is the strongest single signal (correlation 0.40 with a home win), then Elo (0.35).
+- Shots on target are a better form signal than goals (0.26 vs 0.22): shots are less driven by luck.
+- Rest days barely matter in the Premier League (−0.03).
+
 ## Data source
 [football-data.co.uk](https://www.football-data.co.uk/): free match results, stats
 (shots, corners, cards, xG) and odds from major bookmakers, updated twice a week.
@@ -49,6 +72,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python src/ingest.py
+python src/features.py
 ```
 
 This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
@@ -58,10 +82,14 @@ This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
 ```
 premier-league-match-forecasting/
 ├── data/            # SQLite database (generated)
+├── images/          # charts used in this README
+├── notebooks/
+│   └── 03_features.ipynb   # Phase 3: feature walkthrough + leakage test
 ├── sql/
 │   └── 02_exploration.sql  # Phase 2: SQL analysis + findings
 ├── src/
-│   └── ingest.py    # Phase 1: download + load match data
+│   ├── ingest.py    # Phase 1: download + load match data
+│   └── features.py  # Phase 3: build pre-match features
 ├── requirements.txt
 └── README.md
 ```
