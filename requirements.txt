@@ -1,5 +1,6 @@
 pandas
 requests
 matplotlib
+scikit-learn
 ipykernel
 nbconvert

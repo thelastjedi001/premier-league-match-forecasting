@@ -4,7 +4,7 @@ An end-to-end data project: an automated pipeline collects Premier League result
 bookmaker odds, a machine learning model forecasts match outcomes, and a live dashboard
 compares the model's probabilities against the market to find mispriced matches.
 
-> Status: **Phase 3 complete** (feature engineering). Next: the forecasting model.
+> Status: **Phase 4 complete** (forecasting model). Next: the betting backtest.
 
 ## Why this project
 Bookmakers price football matches the way traders price stocks. This project combines
@@ -18,7 +18,7 @@ product (entertainment)**.
 | 1. Data pipeline | Download 6 seasons of EPL results + odds into a SQL database | Python, SQL, data cleaning | ✅ |
 | 2. Exploration | SQL analysis: home advantage, bookmaker accuracy and margin, market expectations | SQL, EDA | ✅ |
 | 3. Features | Rolling form, goals, shots on target, Elo ratings, rest days, market probabilities | Feature engineering, leakage testing | ✅ |
-| 4. Model | Predict Home/Draw/Away probabilities (logistic regression → XGBoost) | ML, probability calibration | ⬜ |
+| 4. Model | Forecast Home/Draw/Away probabilities; compare logistic regression and gradient boosting against the market | ML, time-based validation, calibration | ✅ |
 | 5. Betting backtest | Compare model vs. bookmaker odds, simulate a betting strategy, track ROI | Finance thinking, statistics | ⬜ |
 | 6. Automation | GitHub Actions runs the pipeline + predictions every day | MLOps, scheduling | ⬜ |
 | 7. Dashboard | Streamlit app: upcoming fixtures, predictions, model track record | Deployment, storytelling | ⬜ |
@@ -61,6 +61,32 @@ confirms that match's features are unchanged while later matches update.
 - Shots on target are a better form signal than goals (0.26 vs 0.22): shots are less driven by luck.
 - Rest days barely matter in the Premier League (−0.03).
 
+## Model results (Phase 4)
+A logistic regression forecasts home / draw / away probabilities from 8 features. It
+**never sees the odds**, so it's a fair challenger to the market
+([`src/model.py`](src/model.py), walkthrough in [`notebooks/04_model.ipynb`](notebooks/04_model.ipynb)).
+
+Seasons are split by time: train 2021-24, choose the model on 2024-25, and test once on
+2025-26 and 2026-27 (454 matches).
+
+| Forecast | Log loss ↓ | Brier ↓ | Accuracy ↑ |
+|---|---|---|---|
+| Base rates (no skill) | 1.092 | 0.661 | 41.0% |
+| **Our model** | **1.034** | **0.622** | **47.6%** |
+| Betting market | 1.022 | 0.614 | 48.9% |
+
+![Model vs market](images/model_vs_market.png)
+
+- **The model has real skill** but the market is still slightly ahead, as expected given
+  bookmakers' access to team news and betting flows.
+- **Simple beats complex:** logistic regression beat gradient boosting on validation; with
+  ~1,100 training matches, the flexible model fit noise.
+- **Biggest weakness:** home advantage fell after the training years (46% → ~41% home wins),
+  so the model slightly over-rates home teams ([calibration chart](images/calibration.png)).
+- **Largest disagreements involve Chelsea and Tottenham,** where the model rates them well
+  below the market: the same "reputation bias" hint as Phase 2. Phase 5 tests whether
+  betting on these disagreements makes money.
+
 ## Data source
 [football-data.co.uk](https://www.football-data.co.uk/): free match results, stats
 (shots, corners, cards, xG) and odds from major bookmakers, updated twice a week.
@@ -73,6 +99,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python src/ingest.py
 python src/features.py
+python src/model.py
 ```
 
 This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
@@ -84,12 +111,14 @@ premier-league-match-forecasting/
 ├── data/            # SQLite database (generated)
 ├── images/          # charts used in this README
 ├── notebooks/
-│   └── 03_features.ipynb   # Phase 3: feature walkthrough + leakage test
+│   ├── 03_features.ipynb   # Phase 3: feature walkthrough + leakage test
+│   └── 04_model.ipynb      # Phase 4: model selection, test vs market, calibration
 ├── sql/
 │   └── 02_exploration.sql  # Phase 2: SQL analysis + findings
 ├── src/
 │   ├── ingest.py    # Phase 1: download + load match data
-│   └── features.py  # Phase 3: build pre-match features
+│   ├── features.py  # Phase 3: build pre-match features
+│   └── model.py     # Phase 4: train, select and test the model
 ├── requirements.txt
 └── README.md
 ```
