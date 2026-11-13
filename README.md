@@ -4,7 +4,12 @@ An end-to-end data project: an automated pipeline collects Premier League result
 bookmaker odds, a machine learning model forecasts match outcomes, and a live dashboard
 compares the model's probabilities against the market to find mispriced matches.
 
-> Status: **Phase 4 complete** (forecasting model). Next: the betting backtest.
+> Status: **Version 1 complete** (Phases 1–5). Next: daily automation and a live dashboard.
+
+**The answer, so far: no.** A model built on team form and strength forecasts matches
+almost as well as the bookmakers, but betting on its disagreements with the market lost
+17% over 185 bets, and a luck test finds no evidence of an edge. The market is hard to
+beat with public data alone. [Jump to the backtest](#betting-backtest-phase-5).
 
 ## Why this project
 Bookmakers price football matches the way traders price stocks. This project combines
@@ -19,7 +24,7 @@ product (entertainment)**.
 | 2. Exploration | SQL analysis: home advantage, bookmaker accuracy and margin, market expectations | SQL, EDA | ✅ |
 | 3. Features | Rolling form, goals, shots on target, Elo ratings, rest days, market probabilities | Feature engineering, leakage testing | ✅ |
 | 4. Model | Forecast Home/Draw/Away probabilities; compare logistic regression and gradient boosting against the market | ML, time-based validation, calibration | ✅ |
-| 5. Betting backtest | Compare model vs. bookmaker odds, simulate a betting strategy, track ROI | Finance thinking, statistics | ⬜ |
+| 5. Betting backtest | Bet on model-vs-market disagreements, track ROI, test for luck with simulation | Finance thinking, statistics | ✅ |
 | 6. Automation | GitHub Actions runs the pipeline + predictions every day | MLOps, scheduling | ⬜ |
 | 7. Dashboard | Streamlit app: upcoming fixtures, predictions, model track record | Deployment, storytelling | ⬜ |
 
@@ -87,6 +92,34 @@ Seasons are split by time: train 2021-24, choose the model on 2024-25, and test 
   below the market: the same "reputation bias" hint as Phase 2. Phase 5 tests whether
   betting on these disagreements makes money.
 
+## Betting backtest (Phase 5)
+**Rule:** bet £10 on any outcome where `model probability × average odds − 1` beats a
+minimum edge. The threshold (15%) was chosen on the 2024-25 validation season, then applied
+once to the test seasons ([`src/backtest.py`](src/backtest.py), walkthrough in
+[`notebooks/05_backtest.ipynb`](notebooks/05_backtest.ipynb)).
+
+| Strategy (2025-26 to 2026-27) | Bets | Win rate | Profit | ROI |
+|---|---|---|---|---|
+| Always bet home | 454 | 41.0% | −£580 | −12.8% |
+| Always bet the market favourite | 454 | 48.9% | −£461 | −10.1% |
+| **Our strategy** | **185** | **23.8%** | **−£323** | **−17.4%** |
+
+![Cumulative profit](images/cumulative_pnl.png)
+
+- **Luck test:** replaying the same bets 10,000 times with results drawn from the market's
+  probabilities, 82% of simulations did at least as well. No evidence of skill.
+- **Adverse selection:** the model expected +31% ROI on these bets and the market implied
+  −5.6%; reality was −17%. The biggest disagreements with the market are where the model is
+  most likely to be wrong, because the market knows things it doesn't (injuries, team news).
+- **Home bets lost 34%:** the model learned when home teams won 46% of matches, but in the
+  test seasons they won about 41%.
+- **Reputation bias didn't hold up:** bets against the big six lost as much as other bets.
+- **No cherry-picking:** a 0% threshold would have shown +2.2% on the test, but validation
+  pointed to 15% and results swing wildly between thresholds.
+
+**What could give a real edge:** team news and line-ups, blending the model with market
+prices, retraining weekly, and betting at the best available odds rather than the average.
+
 ## Data source
 [football-data.co.uk](https://www.football-data.co.uk/): free match results, stats
 (shots, corners, cards, xG) and odds from major bookmakers, updated twice a week.
@@ -100,6 +133,7 @@ pip install -r requirements.txt
 python src/ingest.py
 python src/features.py
 python src/model.py
+python src/backtest.py
 ```
 
 This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
@@ -112,13 +146,15 @@ premier-league-match-forecasting/
 ├── images/          # charts used in this README
 ├── notebooks/
 │   ├── 03_features.ipynb   # Phase 3: feature walkthrough + leakage test
-│   └── 04_model.ipynb      # Phase 4: model selection, test vs market, calibration
+│   ├── 04_model.ipynb      # Phase 4: model selection, test vs market, calibration
+│   └── 05_backtest.ipynb   # Phase 5: betting backtest, luck test, breakdowns
 ├── sql/
 │   └── 02_exploration.sql  # Phase 2: SQL analysis + findings
 ├── src/
 │   ├── ingest.py    # Phase 1: download + load match data
 │   ├── features.py  # Phase 3: build pre-match features
-│   └── model.py     # Phase 4: train, select and test the model
+│   ├── model.py     # Phase 4: train, select and test the model
+│   └── backtest.py  # Phase 5: betting strategy, ROI and luck test
 ├── requirements.txt
 └── README.md
 ```
