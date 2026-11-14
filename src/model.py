@@ -6,7 +6,8 @@ Seasons are split by time, never shuffled, so the model is always tested on matc
 that happened after everything it learned from:
   train      2021-22 to 2023-24   fit candidate models
   validate   2024-25              pick the best candidate
-  test       2025-26 to 2026-27   final, untouched comparison against the market
+  test       2025-26 onwards      final, untouched comparison against the market
+                                  (grows automatically as new matches are played)
 
 The model never sees the bookmakers' odds: it uses team form and strength only, so the
 comparison with the market is fair.
@@ -31,7 +32,6 @@ warnings.filterwarnings("ignore", message=".*encountered in matmul")
 
 TRAIN_SEASONS = ["2021-22", "2022-23", "2023-24"]
 VALID_SEASONS = ["2024-25"]
-TEST_SEASONS = ["2025-26", "2026-27"]
 
 OUTCOMES = ["H", "D", "A"]
 FEATURES = [
@@ -90,6 +90,11 @@ def split(features: pd.DataFrame, seasons: list) -> pd.DataFrame:
     return features[features["season"].isin(seasons)]
 
 
+def test_seasons(features: pd.DataFrame) -> list:
+    """Every season after validation, so new seasons join the test set automatically."""
+    return sorted(s for s in features["season"].unique() if s > VALID_SEASONS[-1])
+
+
 def select_model(features: pd.DataFrame) -> tuple:
     train, valid = split(features, TRAIN_SEASONS), split(features, VALID_SEASONS)
     results = {}
@@ -109,7 +114,7 @@ def base_rate_probs(train: pd.DataFrame, n: int) -> np.ndarray:
 def train_and_test(features: pd.DataFrame) -> tuple:
     best_name, validation = select_model(features)
     train = split(features, TRAIN_SEASONS + VALID_SEASONS)
-    test = split(features, TEST_SEASONS).copy()
+    test = split(features, test_seasons(features)).copy()
 
     model = candidate_models()[best_name]
     model.fit(train[FEATURES], train["result"])
@@ -142,7 +147,7 @@ def main() -> None:
     print("Validation (2024-25), lower log loss is better:")
     print(validation.round(4), "\n")
     print(f"Chosen: {best_name}\n")
-    print(f"Test ({', '.join(TEST_SEASONS)}, {len(test)} matches):")
+    print(f"Test ({', '.join(test_seasons(features))}, {len(test)} matches):")
     print(comparison.round(4), "\n")
     print("Saved test-set forecasts to the `predictions` table")
 

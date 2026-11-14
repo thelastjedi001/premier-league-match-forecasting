@@ -1,10 +1,17 @@
 # ⚽ Premier League Match Forecasting: Can a Model Beat the Betting Market?
 
-An end-to-end data project: an automated pipeline collects Premier League results and
-bookmaker odds, a machine learning model forecasts match outcomes, and a live dashboard
-compares the model's probabilities against the market to find mispriced matches.
+[![Tests](https://github.com/thelastjedi001/premier-league-match-forecasting/actions/workflows/tests.yml/badge.svg)](https://github.com/thelastjedi001/premier-league-match-forecasting/actions/workflows/tests.yml)
+[![Weekly update](https://github.com/thelastjedi001/premier-league-match-forecasting/actions/workflows/weekly-update.yml/badge.svg)](https://github.com/thelastjedi001/premier-league-match-forecasting/actions/workflows/weekly-update.yml)
 
-> Status: **Version 1 complete** (Phases 1–5). Next: daily automation and a live dashboard.
+An end-to-end data project: an automated pipeline collects Premier League results and
+bookmaker odds, a machine learning model forecasts match outcomes, and the forecasts are
+compared with the betting market every week.
+
+> Status: **Phases 1–6 complete**, now updating itself every Friday. Next: a live dashboard.
+>
+> Figures in this README are a snapshot of results up to 2 November 2026. The latest
+> numbers are in [`outputs/model_performance.json`](outputs/model_performance.json) and
+> next week's forecasts in [`outputs/upcoming_predictions.csv`](outputs/upcoming_predictions.csv).
 
 **The answer, so far: no.** A model built on team form and strength forecasts matches
 almost as well as the bookmakers, but betting on its disagreements with the market lost
@@ -25,7 +32,7 @@ product (entertainment)**.
 | 3. Features | Rolling form, goals, shots on target, Elo ratings, rest days, market probabilities | Feature engineering, leakage testing | ✅ |
 | 4. Model | Forecast Home/Draw/Away probabilities; compare logistic regression and gradient boosting against the market | ML, time-based validation, calibration | ✅ |
 | 5. Betting backtest | Bet on model-vs-market disagreements, track ROI, test for luck with simulation | Finance thinking, statistics | ✅ |
-| 6. Automation | GitHub Actions runs the pipeline + predictions every day | MLOps, scheduling | ⬜ |
+| 6. Automation | GitHub Actions runs unit tests and the full pipeline weekly, forecasts upcoming fixtures and commits the results | CI/CD, testing, scheduling | ✅ |
 | 7. Dashboard | Streamlit app: upcoming fixtures, predictions, model track record | Deployment, storytelling | ⬜ |
 
 ## Key findings (Phase 2)
@@ -120,6 +127,25 @@ once to the test seasons ([`src/backtest.py`](src/backtest.py), walkthrough in
 **What could give a real edge:** team news and line-ups, blending the model with market
 prices, retraining weekly, and betting at the best available odds rather than the average.
 
+## Automation (Phase 6)
+Every Friday at 09:00 UTC a [GitHub Actions workflow](.github/workflows/weekly-update.yml):
+
+1. runs the unit tests and stops if any fail
+2. runs [`src/pipeline.py`](src/pipeline.py): downloads the latest results, rebuilds features,
+   retrains and re-tests the model, and re-runs the backtest
+3. forecasts the next round of fixtures with [`src/predict.py`](src/predict.py)
+4. commits the refreshed [`outputs/`](outputs/) back to this repository
+
+New seasons are picked up automatically each August. A [second workflow](.github/workflows/tests.yml)
+runs the tests on every push.
+
+**Tests** ([`tests/test_pipeline.py`](tests/test_pipeline.py)) use small made-up seasons, so
+they run in about a second without downloading anything. They check that rolling form uses only
+earlier matches, that a match's own result never leaks into its features, that upcoming
+fixtures get features, that market probabilities sum to 1, that log loss reads the outcome
+columns in the right order, and that seasons roll over in August. Removing the `shift(1)` that
+prevents leakage makes two of them fail.
+
 ## Data source
 [football-data.co.uk](https://www.football-data.co.uk/): free match results, stats
 (shots, corners, cards, xG) and odds from major bookmakers, updated twice a week.
@@ -130,11 +156,12 @@ prices, retraining weekly, and betting at the best available odds rather than th
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python src/ingest.py
-python src/features.py
-python src/model.py
-python src/backtest.py
+python -m pytest            # unit tests
+python src/pipeline.py      # the whole project, start to finish (~10 seconds)
 ```
+
+Each step can also run on its own: `src/ingest.py`, `src/features.py`, `src/model.py`,
+`src/backtest.py`, `src/predict.py`.
 
 This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
 *New Database Connection → SQLite → Path: `data/football.db`*.
@@ -142,19 +169,30 @@ This creates `data/football.db`, a SQLite database. Open it in **DBeaver**:
 ## Project structure
 ```
 premier-league-match-forecasting/
+├── .github/workflows/
+│   ├── tests.yml           # run the tests on every push
+│   └── weekly-update.yml   # Phase 6: weekly pipeline run
 ├── data/            # SQLite database (generated)
 ├── images/          # charts used in this README
 ├── notebooks/
 │   ├── 03_features.ipynb   # Phase 3: feature walkthrough + leakage test
 │   ├── 04_model.ipynb      # Phase 4: model selection, test vs market, calibration
 │   └── 05_backtest.ipynb   # Phase 5: betting backtest, luck test, breakdowns
+├── outputs/         # refreshed weekly by GitHub Actions
+│   ├── model_performance.json
+│   └── upcoming_predictions.csv
 ├── sql/
 │   └── 02_exploration.sql  # Phase 2: SQL analysis + findings
 ├── src/
 │   ├── ingest.py    # Phase 1: download + load match data
 │   ├── features.py  # Phase 3: build pre-match features
 │   ├── model.py     # Phase 4: train, select and test the model
-│   └── backtest.py  # Phase 5: betting strategy, ROI and luck test
+│   ├── backtest.py  # Phase 5: betting strategy, ROI and luck test
+│   ├── predict.py   # Phase 6: forecast upcoming fixtures
+│   └── pipeline.py  # Phase 6: run everything in order
+├── tests/
+│   └── test_pipeline.py    # unit tests
+├── pytest.ini
 ├── requirements.txt
 └── README.md
 ```

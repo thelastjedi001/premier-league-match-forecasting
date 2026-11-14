@@ -1,0 +1,31 @@
+{
+  "updated_at": "2026-11-14 06:51 UTC",
+  "results_through": "2026-11-08",
+  "matches_in_database": 2000,
+  "test": {
+    "seasons": [
+      "2025-26",
+      "2026-27"
+    ],
+    "matches": 464,
+    "model": {
+      "log_loss": 1.0319,
+      "brier": 0.6206,
+      "accuracy": 0.4784
+    },
+    "market": {
+      "log_loss": 1.0198,
+      "brier": 0.613,
+      "accuracy": 0.4892
+    }
+  },
+  "backtest": {
+    "bets": 188.0,
+    "win_rate": 0.2447,
+    "avg_odds": 4.4056,
+    "profit": -288.8,
+    "roi": -0.1536,
+    "luck_test_share_as_good": 0.768
+  },
+  "upcoming_fixtures": 0
+}

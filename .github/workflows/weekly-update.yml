@@ -1,0 +1,45 @@
+name: Weekly update
+
+on:
+  schedule:
+    - cron: "0 9 * * 5"  # every Friday 09:00 UTC, after midweek results and before weekend fixtures
+  workflow_dispatch:     # adds a "Run workflow" button on GitHub
+
+permissions:
+  contents: write        # lets the workflow commit the refreshed outputs
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: python -m pytest -q
+
+      - name: Run the full pipeline
+        run: python src/pipeline.py
+
+      - name: Commit refreshed outputs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add outputs/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Weekly update: $(date -u +%Y-%m-%d)"
+            git push
+          fi

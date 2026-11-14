@@ -111,7 +111,7 @@ def run() -> dict:
     model_name, _ = m.select_model(features)
 
     valid = forecasts(features, model_name, m.TRAIN_SEASONS, m.VALID_SEASONS)
-    test = forecasts(features, model_name, m.TRAIN_SEASONS + m.VALID_SEASONS, m.TEST_SEASONS)
+    test = forecasts(features, model_name, m.TRAIN_SEASONS + m.VALID_SEASONS, m.test_seasons(features))
 
     validation_table = threshold_table(valid)
     threshold = choose_threshold(validation_table)

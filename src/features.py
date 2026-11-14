@@ -28,11 +28,16 @@ POINTS = {"H": (3, 0), "D": (1, 1), "A": (0, 3)}  # result -> (home points, away
 ROLLING_STATS = ["points", "goals_for", "goals_against", "sot_for", "sot_against"]
 
 
-def load_matches(conn: sqlite3.Connection) -> pd.DataFrame:
-    matches = pd.read_sql("SELECT * FROM matches", conn, parse_dates=["match_date"])
+def number_matches(matches: pd.DataFrame) -> pd.DataFrame:
+    """Sort by date and give every match an id in that order."""
+    matches = matches.drop(columns="match_id", errors="ignore")
     matches = matches.sort_values(["match_date", "home_team"]).reset_index(drop=True)
     matches.insert(0, "match_id", matches.index)
     return matches
+
+
+def load_matches(conn: sqlite3.Connection) -> pd.DataFrame:
+    return number_matches(pd.read_sql("SELECT * FROM matches", conn, parse_dates=["match_date"]))
 
 
 def team_view(matches: pd.DataFrame) -> pd.DataFrame:
@@ -44,7 +49,7 @@ def team_view(matches: pd.DataFrame) -> pd.DataFrame:
             "match_date": matches["match_date"],
             "team": matches[f"{side}_team"],
             "is_home": is_home,
-            "points": matches["result"].map(lambda r: POINTS[r][pts]),
+            "points": matches["result"].map({r: p[pts] for r, p in POINTS.items()}),  # blank if unplayed
             "goals_for": matches[f"{side}_goals"],
             "goals_against": matches[f"{other}_goals"],
             "sot_for": matches[f"{side}_shots_on_target"],
@@ -94,6 +99,8 @@ def elo_ratings(matches: pd.DataFrame) -> pd.DataFrame:
 
         home, away = ratings[m.home_team], ratings[m.away_team]
         rows.append((m.match_id, home, away))
+        if pd.isna(m.result):  # an upcoming fixture: rate it, but nothing to learn yet
+            continue
 
         expected_home = 1 / (1 + 10 ** ((away - (home + ELO_HOME_ADVANTAGE)) / 400))
         actual_home = {"H": 1.0, "D": 0.5, "A": 0.0}[m.result]

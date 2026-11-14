@@ -7,6 +7,7 @@ so the current season always has the latest results.
 
 import io
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +17,23 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "football.db"
 BASE_URL = "https://football-data.co.uk/mmz4281/{season}/{league}.csv"
 
 LEAGUE = "E0"  # E0 = English Premier League
-SEASONS = ["2122", "2223", "2324", "2425", "2526", "2627"]
+FIRST_SEASON = 2021  # 2021-22
+
+
+def season_start_year(day: date) -> int:
+    """Seasons start in August: 14 Nov 2026 is in 2026-27, 1 May 2027 too."""
+    return day.year if day.month >= 8 else day.year - 1
+
+
+def season_label(day: date) -> str:
+    start = season_start_year(day)
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
+def seasons_to_download(today: date = None) -> list:
+    """Every season code from FIRST_SEASON to the current one, e.g. ['2122', ..., '2627']."""
+    last = season_start_year(today or date.today())
+    return [f"{y % 100:02d}{(y + 1) % 100:02d}" for y in range(FIRST_SEASON, last + 1)]
 
 # Raw column name -> clean column name
 COLUMNS = {
@@ -86,8 +103,17 @@ def load(df: pd.DataFrame, conn: sqlite3.Connection) -> None:
 def main() -> None:
     DB_PATH.parent.mkdir(exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
-        for season in SEASONS:
-            df = clean(download_season(season), season)
+        for season in seasons_to_download():
+            try:
+                df = clean(download_season(season), season)
+            except requests.HTTPError as error:
+                # A new season's file appears only once its first matches are played
+                if error.response.status_code == 404:
+                    print(f"20{season[:2]}-{season[2:]}: not published yet, skipped")
+                    continue
+                raise
+            if df.empty:
+                continue
             load(df, conn)
             print(f"{df['season'].iloc[0]}: loaded {len(df)} matches")
         total = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
