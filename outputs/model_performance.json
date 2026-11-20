@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-17 01:02 UTC",
+  "updated_at": "2026-11-20 17:32 UTC",
   "results_through": "2026-11-08",
   "matches_in_database": 2000,
   "test": {
@@ -27,5 +27,5 @@
     "roi": -0.1536,
     "luck_test_share_as_good": 0.768
   },
-  "upcoming_fixtures": 0
+  "upcoming_fixtures": 10
 }
